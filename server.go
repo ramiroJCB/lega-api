@@ -3,10 +3,10 @@ package main
 import ("context"
 "encoding/json"
 "fmt"
-//"log"
 "go.mongodb.org/mongo-driver/mongo/options"
 "net/http"
 "time"
+"github.com/gorilla/handlers"
 "github.com/gorilla/mux"
 "go.mongodb.org/mongo-driver/bson"
 "go.mongodb.org/mongo-driver/bson/primitive"
@@ -21,6 +21,7 @@ type Person struct{
 var  client *mongo.Client
 func CreatePersonEndpoint(response http.ResponseWriter, request *http.Request) {
 	response.Header().Set("content-type", "application/json")
+
 	var person Person
 	json.NewDecoder(request.Body).Decode(&person)
 	collection := client.Database("lega-green").Collection("people")
@@ -31,7 +32,7 @@ func CreatePersonEndpoint(response http.ResponseWriter, request *http.Request) {
 func GetPeopleEndpoint(response http.ResponseWriter, request *http.Request) {
 	response.Header().Set("content-type", "application/json")
 	var people []Person
-	collection := client.Database("thepolyglotdeveloper").Collection("people")
+	collection := client.Database("lega-green").Collection("people")
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 	cursor, err := collection.Find(ctx, bson.M{})
 	if err != nil {
@@ -54,11 +55,17 @@ func GetPeopleEndpoint(response http.ResponseWriter, request *http.Request) {
 }
 func main (){
 	fmt.Println("Starting the application...")
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	clientOptions := options.Client().ApplyURI("mongodb+srv://ramiroJCB:7pMIHlYs6OMzQylH@cluster0.uuj77.mongodb.net/lega-people?retryWrites=true&w=majority")
 	client, _ = mongo.Connect(ctx, clientOptions)
 	router := mux.NewRouter()
-	http.ListenAndServe(":12345", router)
+	headers :=handlers.AllowedHeaders([]string{"X-Requested-With","Content-type","Authotization"})
+	methods := handlers.AllowedMethods([]string{"GET","POST","PUT","DELETE"})
+	origins:=handlers.AllowedOrigins([]string{"*"})
+	
 	router.HandleFunc("/person", CreatePersonEndpoint).Methods("POST")
 	router.HandleFunc("/people", GetPeopleEndpoint).Methods("GET")
+
+	http.ListenAndServe(":8080",handlers.CORS(headers,methods,origins)(router))
 }
